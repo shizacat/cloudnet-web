@@ -27,7 +27,19 @@ class Service:
         return web.Response()
     
     async def h_api_process(self, request):
-        """Infer image"""
+        """Infer image
+        
+        POST request json
+        format {"image": "image as base64 (png, jpg, jpeg", "agree_help": <boolean>}
+        
+        Answer:
+        {
+        "status": <string:success, error>,
+        "description": "Описание ошибки",
+        data: {
+            {"label_idx": <int: 0>, "label_name": "название метки"}}
+        }
+        """
         return web.Response()
     
     async def h_health(self, request):

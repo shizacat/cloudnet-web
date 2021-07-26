@@ -1,0 +1,14 @@
+version: "3"
+services:
+  web:
+    build:
+      context: ../../
+      dockerfile: contribute/docker-dev/Dockerfile
+    working_dir: /opt/service
+    ports:
+      - "8880:8080"
+    network_mode: bridge
+    entrypoint: python3 service.py 
+    # command: runserver 0:8000
+    volumes:
+      - ../../source/:/opt/service
