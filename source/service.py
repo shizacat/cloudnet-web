@@ -40,7 +40,14 @@ class Service:
             {"label_idx": <int: 0>, "label_name": "название метки"}}
         }
         """
-        return web.Response()
+        data = {
+            "status": "success",
+            "data": {
+                "label_idx": 0,
+                "label_name": "name label"
+            }
+        }
+        return web.json_response(data)
     
     async def h_health(self, request):
         return web.Response(text="OK")
