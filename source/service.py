@@ -1,24 +1,49 @@
 #!/usr/bin/env python3
 
+import base64
 from pathlib import Path
 
+import aiohttp_cors
 from aiohttp import web
+from PIL import Image
+
+# from infer import CloudNetInfer
 
 
 class Service:
 
-    def __init__(self, port=8080):
+    def __init__(self, port=8080, model_path: str = "/opt/model/model.onnx"):
         self.port = port
+        self.model_path = model_path
+
         self.static_folder = Path("./static")
 
         # init
         self.app = web.Application()
         self.app.router.add_get("/health", self.h_health)
         self.app.router.add_get("/", self.h_main)
-        self.app.router.add_post("/api/process", self.h_api_process)
+        # self.app.router.add_post("/api/process", self.h_api_process)
 
         self.app.router.add_static(
             "/static", self.static_folder, show_index=False)
+
+        # CORS
+        cors = aiohttp_cors.setup(
+            self.app,
+            defaults={
+                "*": aiohttp_cors.ResourceOptions(
+                    allow_credentials=False,
+                    expose_headers="*",
+                    allow_headers="*"
+                )
+            }
+        )
+
+        resource = cors.add(self.app.router.add_resource("/api/process"))
+        cors.add(resource.add_route("POST", self.h_api_process))
+        
+        # init extern
+        # self.cloud = CloudNetInfer(self.model_path)
     
     def run(self):
         web.run_app(self.app)
@@ -51,6 +76,13 @@ class Service:
     
     async def h_health(self, request):
         return web.Response(text="OK")
+    
+    def _img_b64_to_pil(self, img_b64: str):
+        """Convert image from base64 to pil"""
+        img_io = io.BytesIO(base64.b64decode(img_b64))
+        img_io.seek(0)
+        img_pil = Image.open(img_io)
+        return img_pil
 
 
 if __name__ == "__main__":

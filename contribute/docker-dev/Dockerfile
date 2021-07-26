@@ -11,4 +11,7 @@ RUN apt-get	update && \
 	apt-get -y autoremove && \
 	rm -rf /var/lib/apt/lists/*
 
-
+# Setup NN
+RUN mkdir /opt/model && \
+    wget "https://downloader.disk.yandex.ru/disk/6ff7ab19c9dca6d6bf39d9379f04004e4ccec23f062d6f8d6ffe8a54ea65f31b/60ff1317/HhWhdefDg_Ev82UezWhvV32k_-OxgytfEckDBH1JBZ3mKhXXqgUGYEL3GJv0t3kb9EvoWVqB83OQzK_vytRqUw%3D%3D?uid=0&filename=model_v0.onnx&disposition=attachment&hash=6Wy8qwRsgbsoE2XZ7Sk/p/lBAMxzgko5SYV7KMvir3vWrVCLJudu4cZOjytbLRk2q/J6bpmRyOJonT3VoXnDag%3D%3D%3A&limit=0&content_type=application%2Foctet-stream&owner_uid=16862455&fsize=44714084&hid=29fdd0f5b3e0a83ec6d9dd4d5c95d956&media_type=data&tknv=v2" \
+        -O /opt/model/model.onnx
