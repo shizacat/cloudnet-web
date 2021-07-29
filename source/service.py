@@ -66,19 +66,29 @@ class Service:
             {"label_idx": <int: 0>, "label_name": "название метки"}}
         }
         """
-        payload = await request.json()
-        img_pil = self._img_b64_to_pil(payload["image"])
-        lable_idx = self.cloud.infer(img_pil)
-        lable_name = self.cloud.labels[lable_idx]
+        try:
+            payload = await request.json()
+            img_pil = self._img_b64_to_pil(payload["image"])
+            lable_idx = self.cloud.infer(img_pil)
+            lable_name = self.cloud.labels[lable_idx]
 
+            data = {
+                "status": "success",
+                "data": {
+                    "label_idx": lable_idx,
+                    "label_name": lable_name
+                }
+            }
+        except json.decoder.JSONDecodeError as e:
+            return web.json_response(self._error_data(e), status=400)
+        return web.json_response(data)
+    
+    def _error_data(self, msg=""):
         data = {
             "status": "success",
-            "data": {
-                "label_idx": lable_idx,
-                "label_name": lable_name
-            }
+            "description": msg
         }
-        return web.json_response(data)
+        return data
     
     async def h_health(self, request):
         return web.Response(text="OK")
