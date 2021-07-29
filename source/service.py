@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 import io
+import json
 import base64
 from pathlib import Path
 
 import aiohttp_cors
 from aiohttp import web
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 from infer import CloudNetInfer
 
@@ -68,6 +69,10 @@ class Service:
         """
         try:
             payload = await request.json()
+
+            if "image" not in payload.keys():
+                raise ValueError("Don't found the field")
+
             img_pil = self._img_b64_to_pil(payload["image"])
             lable_idx = self.cloud.infer(img_pil)
             lable_name = self.cloud.labels[lable_idx]
@@ -80,7 +85,12 @@ class Service:
                 }
             }
         except json.decoder.JSONDecodeError as e:
-            return web.json_response(self._error_data(e), status=400)
+            return web.json_response(self._error_data(str(e)), status=400)
+        except ValueError as e:
+            return web.json_response(self._error_data(str(e)), status=400)
+        except UnidentifiedImageError as e:
+            msg = "Error in format image: {}".format(e)
+            return web.json_response(self._error_data(msg), status=400)
         return web.json_response(data)
     
     def _error_data(self, msg=""):
