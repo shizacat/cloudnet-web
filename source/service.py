@@ -71,7 +71,7 @@ class Service:
             payload = await request.json()
 
             if "image" not in payload.keys():
-                raise ValueError("Don't found the field")
+                raise ValueError("Don't find the field")
 
             img_pil = self._img_b64_to_pil(payload["image"])
             lable_idx = self.cloud.infer(img_pil)
