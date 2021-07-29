@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import io
 import base64
 from pathlib import Path
 
@@ -7,7 +8,7 @@ import aiohttp_cors
 from aiohttp import web
 from PIL import Image
 
-# from infer import CloudNetInfer
+from infer import CloudNetInfer
 
 
 class Service:
@@ -43,7 +44,7 @@ class Service:
         cors.add(resource.add_route("POST", self.h_api_process))
         
         # init extern
-        # self.cloud = CloudNetInfer(self.model_path)
+        self.cloud = CloudNetInfer(self.model_path)
     
     def run(self):
         web.run_app(self.app)
@@ -65,11 +66,16 @@ class Service:
             {"label_idx": <int: 0>, "label_name": "название метки"}}
         }
         """
+        payload = await request.json()
+        img_pil = self._img_b64_to_pil(payload["image"])
+        lable_idx = self.cloud.infer(img_pil)
+        lable_name = self.cloud.labels[lable_idx]
+
         data = {
             "status": "success",
             "data": {
-                "label_idx": 0,
-                "label_name": "name label"
+                "label_idx": lable_idx,
+                "label_name": lable_name
             }
         }
         return web.json_response(data)
