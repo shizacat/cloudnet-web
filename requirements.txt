@@ -1,5 +1,6 @@
 aiohttp
 aiohttp_cors
+aiohttp-jinja2
 
 onnxruntime
 numpy

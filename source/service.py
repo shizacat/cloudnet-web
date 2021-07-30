@@ -3,9 +3,14 @@
 import io
 import json
 import base64
+import argparse
 from pathlib import Path
+from contextlib import asynccontextmanager
 
+import jinja2
+import aiohttp
 import aiohttp_cors
+import aiohttp_jinja2
 from aiohttp import web
 from PIL import Image, UnidentifiedImageError
 
@@ -13,104 +18,107 @@ from infer import CloudNetInfer
 
 
 class Service:
-
     def __init__(self, port=8080, model_path: str = "/opt/model/model.onnx"):
         self.port = port
         self.model_path = model_path
 
         self.static_folder = Path("./static")
 
-        # init
-        self.app = web.Application()
-        self.app.router.add_get("/health", self.h_health)
-        self.app.router.add_get("/", self.h_main)
-        # self.app.router.add_post("/api/process", self.h_api_process)
+        # Init
+        self.app = web.Application(client_max_size=1024 * 1024 * 20)  # Mb
+        aiohttp_jinja2.setup(
+            self.app, loader=jinja2.FileSystemLoader("./templates")
+        )
+        self.cloud = CloudNetInfer(self.model_path)
 
+        # Routes
+        self.app.router.add_get("/health", self.health)
+        self.app.router.add_get("/", self.main_get)
+        self.app.router.add_post("/", self.main_post)
         self.app.router.add_static(
-            "/static", self.static_folder, show_index=False)
-
-        # CORS
-        cors = aiohttp_cors.setup(
-            self.app,
-            defaults={
-                "*": aiohttp_cors.ResourceOptions(
-                    allow_credentials=False,
-                    expose_headers="*",
-                    allow_headers="*"
-                )
-            }
+            "/static", self.static_folder, show_index=False
         )
 
-        resource = cors.add(self.app.router.add_resource("/api/process"))
-        cors.add(resource.add_route("POST", self.h_api_process))
-        
-        # init extern
-        self.cloud = CloudNetInfer(self.model_path)
-    
     def run(self):
         web.run_app(self.app)
-    
-    async def h_main(self, request):
-        return web.Response()
-    
-    async def h_api_process(self, request):
-        """Infer image
-        
-        POST request json
-        format {"image": "image as base64 (png, jpg, jpeg", "agree_help": <boolean>}
-        
-        Answer:
-        {
-        "status": <string:success, error>,
-        "description": "Описание ошибки",
-        data: {
-            {"label_idx": <int: 0>, "label_name": "название метки"}}
-        }
-        """
+
+    # -- Handlers --
+
+    async def main_post(self, request):
         try:
-            payload = await request.json()
+            # data = await request.post()
+            async with self.extract_file(request, "img") as file_field:
+                img_pil = Image.open(file_field.file)
+                lable_idx = self.cloud.infer(img_pil)
 
-            if "image" not in payload.keys():
-                raise ValueError("Don't find the field")
-
-            img_pil = self._img_b64_to_pil(payload["image"])
-            lable_idx = self.cloud.infer(img_pil)
-            lable_name = self.cloud.labels[lable_idx]
-
-            data = {
-                "status": "success",
-                "data": {
-                    "label_idx": lable_idx,
-                    "label_name": lable_name
-                }
+            answer = {
+                "class_index": lable_idx,
+                "class_name": self.cloud.labels[lable_idx],
             }
-        except json.decoder.JSONDecodeError as e:
-            return web.json_response(self._error_data(str(e)), status=400)
         except ValueError as e:
-            return web.json_response(self._error_data(str(e)), status=400)
+            return self.resp_main(request, is_error=True, msg=str(e))
         except UnidentifiedImageError as e:
-            msg = "Error in format image: {}".format(e)
-            return web.json_response(self._error_data(msg), status=400)
-        return web.json_response(data)
-    
-    def _error_data(self, msg=""):
-        data = {
-            "status": "success",
-            "description": msg
-        }
-        return data
-    
-    async def h_health(self, request):
+            msg = "The file is not image"
+            return self.resp_main(request, is_error=True, msg=msg)
+        return self.resp_main(request, answer=answer)
+
+    async def main_get(self, request):
+        return self.resp_main(request)
+
+    async def health(self, request):
         return web.Response(text="OK")
-    
-    def _img_b64_to_pil(self, img_b64: str):
-        """Convert image from base64 to pil"""
-        img_io = io.BytesIO(base64.b64decode(img_b64))
-        img_io.seek(0)
-        img_pil = Image.open(img_io)
-        return img_pil
+
+    # -- Other --
+
+    def resp_main(self, request, is_error=False, msg="", answer={}):
+        """
+        answer: {class_index, class_name}
+        """
+        context = {
+            "is_error": is_error,
+            "error": {"msg": msg},
+            "answer": answer,
+        }
+        response = aiohttp_jinja2.render_template(
+            "index.html", request, context
+        )
+        return response
+
+    @asynccontextmanager
+    async def extract_file(self, request, field: str):
+        """Извлекает объект файла из запроса
+
+        Raises
+            ValueError
+
+        Return
+            file_field
+            filename, file_object
+        """
+        data = await request.post()
+        img_field = data.get(field)
+
+        if not img_field:
+            raise ValueError("The {} field was not found".format(field))
+        if type(img_field) != aiohttp.web_request.FileField:
+            raise ValueError("The {} field is not file".format(field))
+
+        try:
+            yield img_field
+        finally:
+            img_field.file.close()
+
+
+def arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model-path", type=str, default="/opt/model/model.onnx"
+    )
+    parser.add_argument("--port", type=int, default=8080)
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    srv = Service()
+    args = arguments()
+    srv = Service(port=args.port, model_path=args.model_path)
     srv.run()
