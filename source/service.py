@@ -53,7 +53,7 @@ class Service:
 
             answer = {
                 "class_index": lable_idx,
-                "class_name": self.cloud.labels[lable_idx],
+                "class_name": self.cloud.labels_long[lable_idx],
             }
         except ValueError as e:
             return self.resp_main(request, is_error=True, msg=str(e))

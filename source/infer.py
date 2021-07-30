@@ -13,6 +13,20 @@ class CloudNetInfer:
         self.labels = [
             "Ac", "As", "Cb", "Cc", "Ci", "Cs", "Ct", "Cu", "Ns", "Sc", "St"
         ]
+
+        self.labels_long = [
+            "Altocumulus",
+            "Altostratus",
+            "Cumulonimbus",
+            "Cirrocumulus",
+            "Cirrus",
+            "Cirrostratus",
+            "Contrail",  # don't cloud
+            "Cumulus",
+            "Nimbostratus",
+            "Stratocumulus",
+            "Stratus",
+        ]
     
     def setup(self):
         self.ort_session = onnxruntime.InferenceSession(self.model_path)
